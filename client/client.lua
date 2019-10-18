@@ -28,6 +28,15 @@ function disableEngine()
 	end)
 end
 
+function table.contains(table, element)
+  for _, value in pairs(table) do
+    if value[1] == element then
+      return true
+    end
+  end
+  return false
+end
+
 Citizen.CreateThread(function()
 	while ESX == nil do
 		TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
