@@ -63,6 +63,7 @@ AddEventHandler('nfwlock:onUse', function()
     
     if GetVehicleDoorLockStatus(vehicle) == 1 then
       exports['mythic_notify']:DoHudText('inform', 'Vehicle door is not locked.')
+      pBreaking = false
       return
     end
 
@@ -81,12 +82,28 @@ AddEventHandler('nfwlock:onUse', function()
       exports['progressBars']:startUI(30000, "Lockpicking...")
 
       Citizen.Wait(30000)
-      SetVehicleAlarm(vehicle, true)
-		  SetVehicleAlarmTimeLeft(vehicle, 30 * 1000)
-		  SetVehicleDoorsLocked(vehicle, 1)
-		  SetVehicleDoorsLockedForAllPlayers(vehicle, false)
-      ClearPedTasksImmediately(playerPed)
-      TaskEnterVehicle(playerPed, vehicle, 10.0, -1, 1.0, 1, 0)
+      alarmChance = math.random(100)
+      if alarmChance <= cfg.alarmPercent then
+        local pPed = GetPlayerPed(-1)
+        local pPos = GetEntityCoords(pPed)
+        local sPlates = GetVehicleNumberPlateText(vehicle)
+        TriggerServerEvent('esx_addons_gcphone:startCall', 'police', ('Grand Theft Auto in progress. Plates: ' .. sPlates), PlayerCoords, {
+
+          PlayerCoords = { x = pPos.x, y = pPos.y, z = pPos.z },
+        })
+        Citizen.Wait(2000)
+        SetVehicleAlarm(vehicle, true)
+		    SetVehicleAlarmTimeLeft(vehicle, 30 * 1000)
+		    SetVehicleDoorsLocked(vehicle, 1)
+		    SetVehicleDoorsLockedForAllPlayers(vehicle, false)
+        ClearPedTasksImmediately(playerPed)
+        TaskEnterVehicle(playerPed, vehicle, 10.0, -1, 1.0, 1, 0)
+      else
+        SetVehicleDoorsLocked(vehicle, 1)
+		    SetVehicleDoorsLockedForAllPlayers(vehicle, false)
+        ClearPedTasksImmediately(playerPed)
+        TaskEnterVehicle(playerPed, vehicle, 10.0, -1, 1.0, 1, 0)
+      end
     end)			
   end
 end)	
@@ -135,7 +152,7 @@ function hotWire(vehicle)
   end
 end
 
-local vehicles = {}
+local vehicles = {}; RPWorking = true
 
 RegisterNetEvent('EngineToggle:Engine')
 AddEventHandler('EngineToggle:Engine', function()
@@ -234,6 +251,36 @@ Citizen.CreateThread(function()
 				end
 			end
 		Citizen.Wait(0)
+	end
+end)
+
+Citizen.CreateThread(function()
+	while true do
+		Citizen.Wait(0)
+		if GetSeatPedIsTryingToEnter(GetPlayerPed(-1)) == -1 and not table.contains(vehicles, GetVehiclePedIsTryingToEnter(GetPlayerPed(-1))) then
+			table.insert(vehicles, {GetVehiclePedIsTryingToEnter(GetPlayerPed(-1)), IsVehicleEngineOn(GetVehiclePedIsTryingToEnter(GetPlayerPed(-1)))})
+		elseif IsPedInAnyVehicle(GetPlayerPed(-1), false) and not table.contains(vehicles, GetVehiclePedIsIn(GetPlayerPed(-1), false)) then
+			table.insert(vehicles, {GetVehiclePedIsIn(GetPlayerPed(-1), false), IsVehicleEngineOn(GetVehiclePedIsIn(GetPlayerPed(-1), false))})
+		end
+		for i, vehicle in ipairs(vehicles) do
+			if DoesEntityExist(vehicle[1]) then
+				if (GetPedInVehicleSeat(vehicle[1], -1) == GetPlayerPed(-1)) or IsVehicleSeatFree(vehicle[1], -1) then
+					if RPWorking then
+						SetVehicleEngineOn(vehicle[1], vehicle[2], true, false)
+						SetVehicleJetEngineOn(vehicle[1], vehicle[2])
+						if not IsPedInAnyVehicle(GetPlayerPed(-1), false) or (IsPedInAnyVehicle(GetPlayerPed(-1), false) and vehicle[1]~= GetVehiclePedIsIn(GetPlayerPed(-1), false)) then
+							if IsThisModelAHeli(GetEntityModel(vehicle[1])) or IsThisModelAPlane(GetEntityModel(vehicle[1])) then
+								if vehicle[2] then
+									SetHeliBladesFullSpeed(vehicle[1])
+								end
+							end
+						end
+					end
+				end
+			else
+				table.remove(vehicles, i)
+			end
+		end
 	end
 end)
 
